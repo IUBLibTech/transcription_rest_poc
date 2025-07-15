@@ -1,3 +1,13 @@
+users.txt
+versitygw_environment.sh
+transcription.db
+models/openai-whisper
+models/whisper.cpp
+whisper.cpp/whisper.cpp
+whisper.cpp/whisper-cli
+whisper.cpp/download-ggml-model.sh
+whisper.cpp/download-vad-model.sh
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

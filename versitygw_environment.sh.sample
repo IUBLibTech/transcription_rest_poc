@@ -1,0 +1,4 @@
+export VGW_PORT=:<port number>
+export ROOT_ACCESS_KEY=<access key for versity gw>
+export ROOT_SECRET_KEY=<secret key for versity gw>
+

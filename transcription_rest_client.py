@@ -34,8 +34,8 @@ def main():
                                  "small.en", "small", "medium.en", "medium", 
                                  "large-v1", "large-v2", "large-v3", "large-v3-turbo"],
                         help="Model to use for transcription")
-    for fmt in ('json', 'vtt', 'txt'):
-        submit.add_argument(f"--{fmt}", default=False, action="store_true", help=f"Enable {fmt} output")
+    for fmt in ('json', 'vtt', 'txt', 'meta'):
+        submit.add_argument(f"--{fmt}", type=str, help=f"Object name for {fmt} output")
 
     submit = subparsers.add_parser("whispercpp", help="Submit a new whispercpp job")
     submit.add_argument("s3_endpoint", type=str, help="S3 server endpoint")
@@ -55,8 +55,8 @@ def main():
                                  "large-v3", "large-v3-q5_0", 
                                  "large-v3-turbo", "large-v3-turbo-q5_0", "large-v3-turbo-q8_0"],
                         help="Model to use for transcription")
-    for fmt in ('json', 'vtt', 'txt', 'csv'):
-        submit.add_argument(f"--{fmt}", default=False, action="store_true", help=f"Enable {fmt} output")
+    for fmt in ('json', 'vtt', 'txt', 'csv', 'meta'):
+        submit.add_argument(f"--{fmt}", type=str, help=f"object name for {fmt} output")
 
     args = parser.parse_args()
 
@@ -114,9 +114,10 @@ def whisper(args):
                'outputs': {}
                }
     vargs = vars(args)
-    for fmt in ('json', 'txt', 'vtt'):
-        if vargs.get(fmt, False):
-            options['outputs'][fmt] = ''
+    for fmt in ('json', 'txt', 'vtt', 'meta'):
+        out_obj = vargs.get(fmt, None)
+        if out_obj is not None:
+            options['outputs'][f"{fmt}_url"] = out_obj
     if not options['outputs']:
         raise ValueError("At least one output format must be selected")
     submit_job(args, options)
@@ -131,9 +132,10 @@ def whisper_cpp(args):
                'outputs': {}
                }
     vargs = vars(args)
-    for fmt in ('json', 'txt', 'vtt', 'csv'):
-        if vargs.get(fmt, False):
-            options['outputs'][fmt] = ''
+    for fmt in ('json', 'txt', 'vtt', 'csv', 'meta'):
+        out_obj = vargs.get(fmt, None)
+        if out_obj is not None:
+            options['outputs'][f"{fmt}_url"] = out_obj
     if not options['outputs']:
         raise ValueError("At least one output format must be selected")
     submit_job(args, options)
@@ -150,9 +152,9 @@ def submit_job(args, options):
         args.output_bucket = args.input_bucket
     new_outputs = {}
     for k in options['outputs']:
-        new_outputs[f"{k}_url"] = gen_presigned(args.access_key, args.secret_key,
-                                                args.s3_endpoint, 'put', args.output_bucket,
-                                                args.input_object + f".{k}", 7*24*3600-1)
+        new_outputs[k] = gen_presigned(args.access_key, args.secret_key,
+                                       args.s3_endpoint, 'put', args.output_bucket,
+                                       options['outputs'][k], 7*24*3600-1)
     options['outputs'] = new_outputs
 
     dump_json(options)

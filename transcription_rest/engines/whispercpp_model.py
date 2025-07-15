@@ -11,6 +11,7 @@ class WhisperCPPOutputs(BaseModel):
     vtt_url: Optional[HttpUrl] = Field(default=None, description="URL for Whisper VTT output")
     text_url: Optional[HttpUrl] = Field(default=None, description="URL for Whisper Text output")
     csv_url: Optional[HttpUrl] = Field(default=None, description="URL for Whisper.cpp CSV output")
+    meta_url: Optional[HttpUrl] = Field(default=None, description="URL for processing metadata")
 
     @model_validator(mode="after")
     def check_for_at_least_one_output(self) -> Self:

@@ -70,6 +70,10 @@ def process_whispercpp(job: TranscriptionJob):
                 job.state = TranscriptionState.FINISHED
                 job.message = "Transcription has completed successfully"    
 
+                if req.outputs.meta_url:
+                    # try to write the metadata out.  I don't really care if it fails.
+                    r = requests.put(req.outputs.meta_url, data=job.model_dump_json())
+
             except Exception as e:
                 job.state = TranscriptionState.ERROR
                 job.message = str(e)

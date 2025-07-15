@@ -49,7 +49,7 @@ def process_whisper(job: TranscriptionJob):
                                     language=req.language if req.language != 'auto' else None,
                                     word_timestamps=True)
                 job.processing_time = time.time() - start
-
+                job.language_used = req.language
                 # produce the outputs and write them to the destinations
                 for fmt, url, cls, opts in (('json', req.outputs.json_url, WriteJSON, {}),
                                             ('vtt', req.outputs.vtt_url, WriteVTT, {}),
@@ -66,6 +66,11 @@ def process_whisper(job: TranscriptionJob):
                 
                 job.state = TranscriptionState.FINISHED
                 job.message = "Transcription has completed successfully"    
+
+                if req.outputs.meta_url:
+                    # try to write the metadata out.  I don't really care if it fails.
+                    r = requests.put(req.outputs.meta_url, data=job.model_dump_json())
+
 
             except Exception as e:
                 job.state = TranscriptionState.ERROR

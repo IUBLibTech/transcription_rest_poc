@@ -10,6 +10,7 @@ import sys
 from io import StringIO
 from whisper.utils import WriteJSON, WriteTXT, WriteVTT
 from whisper.transcribe import transcribe
+import subprocess
 
 def process_whisper(job: TranscriptionJob):
     """The heavy lifting.  This actually runs a whisper job based on
@@ -23,6 +24,7 @@ def process_whisper(job: TranscriptionJob):
         # Get our original request from the job
         req = WhisperOptions(**json.loads(job.request)['options'])
         with TemporaryDirectory() as tmpdir:
+            p = None
             try:
                 print(f"starting whisper for {job.id}")    
                 # download the file
@@ -37,6 +39,12 @@ def process_whisper(job: TranscriptionJob):
                     with open(tmpdir + "/input_audio.dat", 'wb') as f:
                         for chunk in r.iter_content(chunk_size=65536):
                             f.write(chunk)
+
+
+                # convert the file to wave.
+                p = subprocess.run(['ffmpeg', '-i', tmpdir + "/input_audio.dat",
+                                tmpdir + "/input_audio.wav"], stderr=subprocess.STDOUT,
+                                stdout=subprocess.PIPE, check=True)
 
                 # load the model
                 model = whisper.load_model(req.model, download_root=sys.path[0] + "/models/openai-whisper")
@@ -53,7 +61,7 @@ def process_whisper(job: TranscriptionJob):
                 # produce the outputs and write them to the destinations
                 for fmt, url, cls, opts in (('json', req.outputs.json_url, WriteJSON, {}),
                                             ('vtt', req.outputs.vtt_url, WriteVTT, {}),
-                                            ('text', req.outputs.text_url, WriteTXT, {})):
+                                            ('txt', req.outputs.text_url, WriteTXT, {})):
                     if url:
                         f = StringIO()
                         c = cls('/tmp')   
@@ -77,6 +85,8 @@ def process_whisper(job: TranscriptionJob):
                 job.message = str(e)
                 print("interior exception", e)
                 print(job)
+                if p:
+                    print(p.stdout)
     except Exception as e:
         print(f"EGADS, it failed!: {e}")
         job.state = TranscriptionState.ERROR

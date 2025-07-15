@@ -9,12 +9,12 @@ class WhisperOutputs(BaseModel):
     """URIs for Whisper Output"""
     json_url: Optional[HttpUrl] = Field(default=None, description="URL for Whisper JSON output")
     vtt_url: Optional[HttpUrl] = Field(default=None, description="URL for Whisper VTT output")
-    text_url: Optional[HttpUrl] = Field(default=None, description="URL for Whisper Text output")
+    txt_url: Optional[HttpUrl] = Field(default=None, description="URL for Whisper Text output")
     meta_url: Optional[HttpUrl] = Field(default=None, description="URL for processing metadata")
 
     @model_validator(mode="after")
     def check_for_at_least_one_output(self) -> Self:
-        for v in (self.json_url, self.vtt_url, self.text_url):
+        for v in (self.json_url, self.vtt_url, self.txt_url):
             if v is not None and v != '':                
                 return self        
         raise ValueError("At least one output must be selected")

@@ -13,6 +13,7 @@ import re
 def process_whispercpp(job: TranscriptionJob):
     """The heavy lifting.  This actually runs a whisper.cpp job based on
        the parameters."""   
+    p = None
     try:
         # Get our original request from the job
         req = WhisperCPPOptions(**json.loads(job.request)['options'])
@@ -32,13 +33,19 @@ def process_whispercpp(job: TranscriptionJob):
                         for chunk in r.iter_content(chunk_size=65536):
                             f.write(chunk)
 
+                # convert the file to wave.
+                p = subprocess.run(['ffmpeg', '-i', tmpdir + "/input_audio.dat",
+                                tmpdir + "/input_audio.wav"], stderr=subprocess.STDOUT,
+                                stdout=subprocess.PIPE, check=True)
+
+
                 # get the rest service root directory 
                 rest_dir = Path(sys.path[0])
                 model_file = rest_dir / "models/whisper.cpp" / ('ggml-' + req.model + ".bin")
                 whispercpp = rest_dir / "whisper.cpp/whisper-cli"
                 start = time.time()
                 p = subprocess.run([str(whispercpp), 
-                                    tmpdir + "/input_audio.dat",
+                                    tmpdir + "/input_audio.wav",
                                     '--model', str(model_file),
                                     '-of', tmpdir + "/output",
                                     '-ojf', '-otxt', '-ovtt', '-ocsv', 
@@ -46,11 +53,12 @@ def process_whispercpp(job: TranscriptionJob):
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, 
                                     encoding='utf-8',
                                     check=True)
+
                 job.processing_time = time.time() - start
                 for fmt, url in (('json', req.outputs.json_url),
                                  ('vtt', req.outputs.vtt_url),
                                  ('csv', req.outputs.csv_url),
-                                 ('txt', req.outputs.text_url)):
+                                 ('txt', req.outputs.txt_url)):
                     if url:
                         data = Path(tmpdir, f"output.{fmt}").read_text()                            
                         r = requests.put(url, data=data)
@@ -79,6 +87,8 @@ def process_whispercpp(job: TranscriptionJob):
                 job.message = str(e)
                 print("interior exception", e)
                 print(job)
+                if p:
+                    print(p.stdout)
     except Exception as e:
         print(f"EGADS, it failed!: {e}")
         job.state = TranscriptionState.ERROR

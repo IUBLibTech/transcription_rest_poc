@@ -3,8 +3,8 @@ from pydantic import BaseModel, HttpUrl
 from sqlmodel import SQLModel, Field
 
 from enum import StrEnum
-from .engines.whisper_model import WhisperOptions
-from .engines.whispercpp_model import WhisperCPPOptions
+from engines.whisper_model import WhisperOptions
+from engines.whispercpp_model import WhisperCPPOptions
 
 
 TranscriptionState = StrEnum("TranscriptionState", 

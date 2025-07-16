@@ -3,7 +3,7 @@ import time
 import requests
 from tempfile import TemporaryDirectory
 import whisper
-from ..transcriptionjob_model import TranscriptionJob, TranscriptionState
+from job_model import TranscriptionJob, TranscriptionState
 from .whisper_model import WhisperOptions
 import json
 import sys
@@ -11,8 +11,10 @@ from io import StringIO
 from whisper.utils import WriteJSON, WriteTXT, WriteVTT
 from whisper.transcribe import transcribe
 import subprocess
+from config_model import ServerConfig
+import logging
 
-def process_whisper(job: TranscriptionJob):
+def process_whisper(job: TranscriptionJob, config: ServerConfig):
     """The heavy lifting.  This actually runs a whisper job based on
        the parameters."""
     # we're in a separate thread from the rest of the asyncio stuff, which
@@ -26,7 +28,7 @@ def process_whisper(job: TranscriptionJob):
         with TemporaryDirectory() as tmpdir:
             p = None
             try:
-                print(f"starting whisper for {job.id}")    
+                logging.info(f"starting whisper for {job.id}")    
                 # download the file
                 with requests.get(url=req.input, stream=True) as r:
                     if r.status_code == 403:
@@ -47,7 +49,8 @@ def process_whisper(job: TranscriptionJob):
                                 stdout=subprocess.PIPE, check=True)
 
                 # load the model
-                model = whisper.load_model(req.model, download_root=sys.path[0] + "/models/openai-whisper")
+                #model = whisper.load_model(req.model, download_root=sys.path[0] + "/models/openai-whisper")
+                model = whisper.load_model(req.model, download_root=config.files.models_dir + "/openai-whisper")
 
                 # prep and load the file
                 audio = whisper.load_audio(tmpdir + "/input_audio.dat", 16000)
@@ -61,7 +64,7 @@ def process_whisper(job: TranscriptionJob):
                 # produce the outputs and write them to the destinations
                 for fmt, url, cls, opts in (('json', req.outputs.json_url, WriteJSON, {}),
                                             ('vtt', req.outputs.vtt_url, WriteVTT, {}),
-                                            ('txt', req.outputs.text_url, WriteTXT, {})):
+                                            ('txt', req.outputs.txt_url, WriteTXT, {})):
                     if url:
                         f = StringIO()
                         c = cls('/tmp')   

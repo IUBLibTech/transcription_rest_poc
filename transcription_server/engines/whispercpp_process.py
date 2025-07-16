@@ -2,15 +2,16 @@
 import time
 import requests
 from tempfile import TemporaryDirectory
-from ..transcriptionjob_model import TranscriptionJob, TranscriptionState
+from job_model import TranscriptionJob, TranscriptionState
 from .whispercpp_model import WhisperCPPOptions
 import json
 import sys
 import subprocess
 from pathlib import Path
 import re
+from config_model import ServerConfig
 
-def process_whispercpp(job: TranscriptionJob):
+def process_whispercpp(job: TranscriptionJob, config: ServerConfig):
     """The heavy lifting.  This actually runs a whisper.cpp job based on
        the parameters."""   
     p = None
@@ -40,9 +41,11 @@ def process_whispercpp(job: TranscriptionJob):
 
 
                 # get the rest service root directory 
-                rest_dir = Path(sys.path[0])
-                model_file = rest_dir / "models/whisper.cpp" / ('ggml-' + req.model + ".bin")
-                whispercpp = rest_dir / "whisper.cpp/whisper-cli"
+                #rest_dir = Path(sys.path[0])
+                #model_file = rest_dir / "models/whisper.cpp" / ('ggml-' + req.model + ".bin")
+                #whispercpp = rest_dir / "whisper.cpp/whisper-cli"
+                model_file = Path(config.files.models_dir, 'whisper.cpp', f"ggml-{req.model}.bin")
+                whispercpp = config.server.root + "/whisper.cpp/whisper-cli"
                 start = time.time()
                 p = subprocess.run([str(whispercpp), 
                                     tmpdir + "/input_audio.wav",

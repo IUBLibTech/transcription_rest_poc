@@ -1,25 +1,32 @@
+#!/bin/env python3
 from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import SQLModel, Session, create_engine, select
 from contextlib import asynccontextmanager
 import asyncio
-from .transcriptionjob_model import TranscriptionJob, TranscriptionState, TranscriptionEngine, TranscriptionRequest
-from .engines.whisper_process import process_whisper
-from .engines.whispercpp_process import process_whispercpp
+from job_model import TranscriptionJob, TranscriptionState, TranscriptionEngine, TranscriptionRequest
+from engines.whisper_process import process_whisper
+from engines.whispercpp_process import process_whispercpp
+from config_model import ServerConfig
 import json
-import sys
+import logging
 
-engine = create_engine("sqlite:///" + sys.path[0] + "/transcription.db",
-                       connect_args={'check_same_thread': False})
+engine = None
 
 security = HTTPBearer()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global engine
     # things at startup
     # -- create the database as needed
     # -- restart any background processes that need it
+    #engine = create_engine("sqlite:///" + sys.path[0] + "/transcription.db",
+    #                       connect_args={'check_same_thread': False})
+    config: ServerConfig = app.server_config
+    engine = create_engine("sqlite:///" + config.files.database,
+                           connect_args={'check_same_thread': False})
     SQLModel.metadata.create_all(engine)
     t = asyncio.create_task(process_transcription_queue())
     yield
@@ -43,7 +50,9 @@ def validate_credentials(credentials: HTTPAuthorizationCredentials):
     if credentials.scheme != 'Bearer':
         raise HTTPException(401, "Invalid authorization token")    
     try:
-        with open(sys.path[0] + "/users.txt") as f:
+        #with open(sys.path[0] + "/users.txt") as f:
+        config: ServerConfig = app.server_config
+        with open(config.files.users) as f:
             for l in f.readlines():
                 is_admin, user, token = l.strip().split(':')
                 if token == credentials.credentials:
@@ -138,7 +147,8 @@ async def process_transcription_queue():
                     running.state = TranscriptionState.QUEUED
                 session.commit()
             
-                # now time for the core of this monstrosity.
+                # now time for the core of this monstrosity.                
+                config: ServerConfig = app.server_config
                 while True:      
                     # if some jobs have been canceled since we last ran our check, let's clean them up.
                     for canceled in session.exec(select(TranscriptionJob).where(TranscriptionJob.state == TranscriptionState.CANCELED)):
@@ -156,13 +166,13 @@ async def process_transcription_queue():
                         xscript_engine = req['options']['engine']                        
                         # real work would happen here.  Th
                         if xscript_engine == TranscriptionEngine['openai-whisper']:
-                            print("whisper started")
-                            await asyncio.to_thread(process_whisper, queued)
-                            print("whisper finished")
+                            logging.info("whisper started")
+                            await asyncio.to_thread(process_whisper, queued, config)
+                            logging.info("whisper finished")
                         elif xscript_engine == TranscriptionEngine['whisper.cpp']:
-                            print("whispercpp started")
-                            await asyncio.to_thread(process_whispercpp, queued)
-                            print("whispercpp finished")
+                            logging.info("whispercpp started")
+                            await asyncio.to_thread(process_whispercpp, queued, config)
+                            logging.info("whispercpp finished")
                         else:
                             queued.state = TranscriptionState.ERROR
                             queued.message = f"Selected transcription engine {xscript_engine} is not available"
@@ -170,5 +180,6 @@ async def process_transcription_queue():
                     # give some time before polling the queue
                     await asyncio.sleep(10)
         except Exception as e:
-            print(f"Something sploded: {e}")
+            logging.exception(f"Something sploded: {e}")
             await asyncio.sleep(10)
+

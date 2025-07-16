@@ -15,6 +15,8 @@ def main():
     
     list_parser = subparsers.add_parser("list", help="List all jobs in the service")
     
+    purge_parser = subparsers.add_parser("purge", help="Purge any jobs where the client never finalized it")
+
     info_parser = subparsers.add_parser("info", help="Information about a job")    
     info_parser.add_argument("id", type=int, help="Job ID")
 
@@ -77,6 +79,7 @@ def main():
 
     try:
         {'list': list_jobs,
+         'purge': purge_jobs,
         'info': job_info,
         'delete': delete_job,
         'whisper': whisper,
@@ -90,6 +93,15 @@ def list_jobs(args):
     r.raise_for_status()
     dump_json(r.json())
 
+
+def purge_jobs(args):
+    r = requests.get(args.endpoint + "/transcription/",
+                     headers={'Authorization': f"Bearer {args.token}"})
+    for j in r.json():
+         r = requests.get(args.endpoint + f"/transcription/{j['id']}",
+                     headers={'Authorization': f"Bearer {args.token}"})   
+
+    print("Extraneous rows should be purged")
 
 def job_info(args):    
     r = requests.get(args.endpoint + f"/transcription/{args.id}",

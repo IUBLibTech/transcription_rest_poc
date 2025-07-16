@@ -1,5 +1,5 @@
 from typing import Literal, Optional
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from sqlmodel import SQLModel, Field
 
 from enum import StrEnum
@@ -12,11 +12,13 @@ TranscriptionState = StrEnum("TranscriptionState",
 TranscriptionEngine = StrEnum("TranscriptionEngine", 
                               "openai-whisper whisper.cpp")
 
+
 class TranscriptionRequest(BaseModel):
     """Make a request for a new transcription"""
     version: Literal['1'] = '1'
     options: WhisperOptions | WhisperCPPOptions = Field(discriminator="engine",
                                                         description="Engine-specific options")
+
 
 class TranscriptionJob(SQLModel, table=True):
     """A transcription job"""

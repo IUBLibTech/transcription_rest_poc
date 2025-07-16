@@ -8,6 +8,7 @@ whisper.cpp/whisper-cli
 whisper.cpp/download-ggml-model.sh
 whisper.cpp/download-vad-model.sh
 etc/server.conf
+nohup.out
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

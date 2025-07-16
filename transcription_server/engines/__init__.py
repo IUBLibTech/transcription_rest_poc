@@ -1,5 +1,5 @@
 from pydantic import HttpUrl
-from sqlmodel import SQLModel, String, TypeDecorator
+from sqlmodel import String, TypeDecorator
 
 
 class HttpUrlType(TypeDecorator):

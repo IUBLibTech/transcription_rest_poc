@@ -5,7 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import SQLModel, Session, create_engine, select
 from contextlib import asynccontextmanager
 import asyncio
-from job_model import TranscriptionJob, TranscriptionState, TranscriptionEngine, TranscriptionRequest
+from job_model import TranscriptionJob, TranscriptionState, TranscriptionRequest
 from engines.whisper_process import process_whisper
 from engines.whispercpp_process import process_whispercpp
 from config_model import ServerConfig
@@ -168,7 +168,12 @@ async def process_transcription_queue():
                         processors = {'openai-whisper': process_whisper,
                                       'whisper.cpp': process_whispercpp}
                         if xscript_engine in processors:
-                            logging.info(f"Starting transcription job {queued.id} on {xscript_engine}: {req['options']}")
+                            parms = {}
+                            for k, v in req['options'].items():
+                                if k not in ('input', 'outputs'):
+                                    parms[k] = v
+
+                            logging.info(f"Starting transcription job {queued.id} on {xscript_engine}: {parms}")
                             await asyncio.to_thread(processors[xscript_engine], queued, config)
                             logging.info(f"Finished transcribing {queued.id}, {queued.state}: {queued.message}")
                         else:

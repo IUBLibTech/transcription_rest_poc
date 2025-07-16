@@ -1,0 +1,11 @@
+---
+server:
+  port: 8125
+  host: 0.0.0.0
+
+files:
+  database: var/transcription.db
+  log_dir: var
+  models_dir: models
+  users: etc/users.txt
+

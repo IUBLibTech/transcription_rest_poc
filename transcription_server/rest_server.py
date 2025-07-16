@@ -58,7 +58,7 @@ def validate_credentials(credentials: HTTPAuthorizationCredentials):
                 if token == credentials.credentials:
                     return user, is_admin.lower()[0] == 'y'
     except Exception as e:
-        print(f"Cannot read credentials file: {e}")
+        logging.warning(f"Cannot read credentials file: {e}.  Will deny access")
     raise HTTPException(401, "Invalid authorization token")
 
 
@@ -164,16 +164,15 @@ async def process_transcription_queue():
                         # extract it and make our choice.
                         req = json.loads(queued.request)
                         xscript_engine = req['options']['engine']                        
-                        # real work would happen here.  Th
-                        if xscript_engine == TranscriptionEngine['openai-whisper']:
-                            logging.info("whisper started")
-                            await asyncio.to_thread(process_whisper, queued, config)
-                            logging.info("whisper finished")
-                        elif xscript_engine == TranscriptionEngine['whisper.cpp']:
-                            logging.info("whispercpp started")
-                            await asyncio.to_thread(process_whispercpp, queued, config)
-                            logging.info("whispercpp finished")
+                        # real work would happen here.  
+                        processors = {'openai-whisper': process_whisper,
+                                      'whisper.cpp': process_whispercpp}
+                        if xscript_engine in processors:
+                            logging.info(f"Starting transcription job {queued.id} on {xscript_engine}: {req['options']}")
+                            await asyncio.to_thread(processors[xscript_engine], queued, config)
+                            logging.info(f"Finished transcribing {queued.id}, {queued.state}: {queued.message}")
                         else:
+                            logging.warning(f"Client has requested an invalid transcription engine for job {queued.id}: {xscript_engine}")
                             queued.state = TranscriptionState.ERROR
                             queued.message = f"Selected transcription engine {xscript_engine} is not available"
                         session.commit()

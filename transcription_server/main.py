@@ -64,8 +64,6 @@ def main():
                     }
     }
 
-
-
     # run the application
     uvicorn.run(rest_server.app, 
                 host=server_conf.server.host,

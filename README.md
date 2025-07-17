@@ -281,7 +281,7 @@ $ python3.12 transcription_rest_client.py $REST_URL info 200
   "message": "Job has been queued",
   "owner": "bdwheele",
   "processing_time": 0.0,
-  "request": "{\"version\":\"1\",\"options\":{\"engine\":\"openai-whisper\",\"language\":\"en\",\"model\":\"small.en\",\"input\":\"http://server-private:10323/input/gettysburg.wav?<aws-stuff>\",\"outputs\":{\"json_url\":\"http://server-private:10323/output/gettysburg.wav-whisper-small.en.json?<aws-stuff>\",\"txt_url\":\"http://server-private:10323/output/gettysburg.wav-whisper-small.en.txt?<aws-stuff>\",\"meta_url\":\"http://server-private:10323/output/gettysburg.wav-whisper-small.en.meta?<aws-stuff>"}}}",
+  "request": "{\"version\":\"1\",\"options\":{\"engine\":\"openai-whisper\",\"language\":\"en\",\"model\":\"small.en\",\"input\":\"http://server-private:10323/input/gettysburg.wav?<aws-stuff>\",\"outputs\":{\"json_url\":\"http://server-private:10323/output/gettysburg.json?<aws-stuff>\",\"txt_url\":\"http://server-private:10323/output/gettysburg.txt?<aws-stuff>\",\"meta_url\":\"http://server-private:10323/output/gettysburg.meta?<aws-stuff>"}}}",
   "state": "queued"
 }
 ```

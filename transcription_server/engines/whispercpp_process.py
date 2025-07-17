@@ -56,7 +56,7 @@ def process_whispercpp(job: TranscriptionJob, config: ServerConfig):
                                 ('csv', req.outputs.csv_url),
                                 ('txt', req.outputs.txt_url)):
                 if url:
-                    data = Path(tmpdir, f"output.{fmt}").read_text()                            
+                    data = Path(tmpdir, f"output.{fmt}").read_bytes()  # was read_text() and it'd fail.
                     r = requests.put(url, data=data)
                     if r.status_code == 403:
                         job.state = TranscriptionState.EXPIRED

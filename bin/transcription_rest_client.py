@@ -156,17 +156,23 @@ def whisper_cpp(args):
 def submit_job(args, options):
     "Here's where the submission magic happens"
     # first, we need to generate a presigned get url for the input...
-    options['input'] = gen_presigned(args.access_key, args.secret_key,
-                                     args.s3_endpoint, 'get', args.input_bucket,
-                                     args.input_object, 7*24*3600-1)
+    if args.input_object.startswith('http://') or args.input_object.startswith('https://'):
+        options['input'] = args.input_object
+    else:
+        options['input'] = gen_presigned(args.access_key, args.secret_key,
+                                        args.s3_endpoint, 'get', args.input_bucket,
+                                        args.input_object, 7*24*3600-1)
     # and then generate presigned put urls for the outputs...
     if args.output_bucket is None:
         args.output_bucket = args.input_bucket
     new_outputs = {}
     for k in options['outputs']:
-        new_outputs[k] = gen_presigned(args.access_key, args.secret_key,
-                                       args.s3_endpoint, 'put', args.output_bucket,
-                                       options['outputs'][k], 7*24*3600-1)
+        if options['outputs'][k].startswith('http://') or options['outputs'][k].startswith('https://'):
+            pass  # already a URL
+        else:
+            new_outputs[k] = gen_presigned(args.access_key, args.secret_key,
+                                           args.s3_endpoint, 'put', args.output_bucket,
+                                           options['outputs'][k], 7*24*3600-1)
     options['outputs'] = new_outputs
 
     dump_json(options)

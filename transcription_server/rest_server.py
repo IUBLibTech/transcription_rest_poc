@@ -11,6 +11,8 @@ from engines.whispercpp_process import process_whispercpp
 from config_model import ServerConfig
 import json
 import logging
+import time
+import requests
 
 engine = None
 
@@ -22,8 +24,6 @@ async def lifespan(app: FastAPI):
     # things at startup
     # -- create the database as needed
     # -- restart any background processes that need it
-    #engine = create_engine("sqlite:///" + sys.path[0] + "/transcription.db",
-    #                       connect_args={'check_same_thread': False})
     config: ServerConfig = app.server_config
     engine = create_engine("sqlite:///" + config.files.database,
                            connect_args={'check_same_thread': False})
@@ -42,20 +42,18 @@ def get_session():
 # Create a session dependency for the API calls.
 SessionDep = Annotated[Session, Depends(get_session)]
 
-
 app = FastAPI(lifespan=lifespan)
 
 def validate_credentials(credentials: HTTPAuthorizationCredentials):
     """Validate the bearer token against the ones we know."""
     if credentials.scheme != 'Bearer':
         raise HTTPException(401, "Invalid authorization token")    
-    try:
-        #with open(sys.path[0] + "/users.txt") as f:
+    try:        
         config: ServerConfig = app.server_config
         with open(config.files.users) as f:
             for l in f.readlines():
                 is_admin, user, token = l.strip().split(':')
-                if token == credentials.credentials:
+                if f"{user}:{token}" == credentials.credentials:
                     return user, is_admin.lower()[0] == 'y'
     except Exception as e:
         logging.warning(f"Cannot read credentials file: {e}.  Will deny access")
@@ -87,7 +85,8 @@ async def new_transcription_job(req: TranscriptionRequest,
     job = TranscriptionJob(owner=user,
                            state=TranscriptionState.QUEUED,
                            message="Job has been queued",
-                           request=req.model_dump_json())
+                           request=req.model_dump_json(),
+                           queue_time=time.time())
     
     session.add(job)
     session.commit()
@@ -130,8 +129,11 @@ async def get_transcript_job(id: int,
     if job.state in (TranscriptionState.FINISHED, TranscriptionState.CANCELED, 
                      TranscriptionState.ERROR, TranscriptionState.EXPIRED):
         # clean up the database row -- they got their status so we can remove the job.
-        session.delete(job)
-        session.commit()
+        req = TranscriptionRequest(**json.loads(job.request))
+        if req.notification_type == 'poll':
+            # the polling notification clears early
+            session.delete(job)
+            session.commit()
     
     return job
 
@@ -154,22 +156,35 @@ async def process_transcription_queue():
                     for canceled in session.exec(select(TranscriptionJob).where(TranscriptionJob.state == TranscriptionState.CANCELED)):
                         session.delete(canceled)                
                     session.commit()
+
+                    # do the database cleanup, and handle any outstanding notifications
+                    for outstanding in session.exec(select(TranscriptionJob)):
+                        if outstanding.state in (TranscriptionState.FINISHED, TranscriptionState.EXPIRED, TranscriptionState.ERROR):
+                            req = TranscriptionRequest(**json.loads(outstanding.request))
+                            if req.notification_type == 'url' and not outstanding.url_notified:
+                                r = requests.put(req.notification_url, json=outstanding.model_dump())
+                                if r.status_code == 200:
+                                    outstanding.url_notified = True
+                            if time.time() > req.expiration + outstanding.finish_time:
+                                session.delete(outstanding)
+
                     # TODO: handle if the cancel happens while we're running.  The processing needs to finish, but
                     # we should throw away the database row.  Not sure how to track it.
                     for queued in session.exec(select(TranscriptionJob).where(TranscriptionJob.state == TranscriptionState.QUEUED)):
                         queued.state = TranscriptionState.RUNNING
                         queued.message = "Transcription started"
+                        queued.start_time = time.time()
                         session.commit()
                         # The engine to use is embedded in the request field, so we need to
                         # extract it and make our choice.
-                        req = json.loads(queued.request)
-                        xscript_engine = req['options']['engine']                        
+                        req = TranscriptionRequest(**json.loads(queued.request))
+                        xscript_engine = req.options.engine
                         # real work would happen here.  
                         processors = {'openai-whisper': process_whisper,
                                       'whisper.cpp': process_whispercpp}
                         if xscript_engine in processors:
                             parms = {}
-                            for k, v in req['options'].items():
+                            for k, v in req.options.items():
                                 if k not in ('input', 'outputs'):
                                     parms[k] = v
 
@@ -180,10 +195,21 @@ async def process_transcription_queue():
                             logging.warning(f"Client has requested an invalid transcription engine for job {queued.id}: {xscript_engine}")
                             queued.state = TranscriptionState.ERROR
                             queued.message = f"Selected transcription engine {xscript_engine} is not available"
+                        
+                        queued.finish_time = time.time()    
+
+                        # attempt to notify the client if the url notification scheme was selected
+                        if req.notification_type == 'url':
+                            r = requests.put(req.notification_url, json=queued.model_dump())
+                            if r.status_code == 200:
+                                queued.url_notified = True
+
                         session.commit()
-                    # give some time before polling the queue
+                    # give some time before polling the queue again.
                     await asyncio.sleep(10)
         except Exception as e:
-            logging.exception(f"Something sploded: {e}")
+            logging.exception(f"Something sploded: {e}")                
+            # wait for 10 seconds in case it's a logic/syntax error so we can 
+            # actually kill it from the command line
             await asyncio.sleep(10)
 

@@ -2,7 +2,7 @@ from typing import Literal, Optional, Self
 from pydantic import BaseModel, model_validator
 from sqlmodel import SQLModel, Field
 
-from enum import StrEnum
+from enum import StrEnum, IntEnum
 from engines.whisper_model import WhisperOptions
 from engines.whispercpp_model import WhisperCPPOptions
 
@@ -14,15 +14,20 @@ TranscriptionEngine = StrEnum("TranscriptionEngine",
 TranscriptionNotificationType = StrEnum("TranscriptionNotificationType",
                                         "poll expire url")
 
+TranscriptionPriority = IntEnum("TranscriptionPriority", 
+                             [('BATCH', 0), ('NORMAL', 1), ('URGENT', 2)])
+
 class TranscriptionRequest(BaseModel):
     """Make a request for a new transcription"""
     version: Literal['1'] = '1'
-    notification_type: TranscriptionNotificationType = Field(default="poll", 
+    notification_type: TranscriptionNotificationType = Field(default=TranscriptionNotificationType.poll, 
                                                              description="Type of notification to use when the job has finished")
     notification_url: str | None = Field(default=None, 
                                          description="If the notification_type is 'url', issue a PUT to this URL with the job as the payload")
     expiration: float = Field(default=3600.0,
                               description="After the job has completed remove the database entry after this many seconds (reading the job info after completion will also remove it)")
+    priority: TranscriptionPriority = Field(default=TranscriptionPriority.NORMAL,
+                                            description="Transcription priority")
     options: WhisperOptions | WhisperCPPOptions = Field(discriminator="engine",
                                                         description="Engine-specific options")
 
@@ -50,3 +55,4 @@ class TranscriptionJob(SQLModel, table=True):
     processing_time: float = Field(default=0.0, description="Time to process the job")
     url_notified: bool = Field(default=False,
                                description="If notification_type is 'url', Whether or not the notification_url has been notified")
+    priority: int = Field(default=0, description="Processing priority")    

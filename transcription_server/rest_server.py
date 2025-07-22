@@ -111,6 +111,7 @@ async def new_transcription_job(req: TranscriptionRequest,
                            state=TranscriptionState.QUEUED,
                            message="Job has been queued",
                            request=req.model_dump_json(),
+                           priority=int(req.priority),
                            queue_time=time.time())
     
     session.add(job)
@@ -195,7 +196,13 @@ async def process_transcription_queue():
 
                     # TODO: handle if the cancel happens while we're running.  The processing needs to finish, but
                     # we should throw away the database row.  Not sure how to track it.
-                    for queued in session.exec(select(TranscriptionJob).where(TranscriptionJob.state == TranscriptionState.QUEUED)):
+                    #for queued in session.exec(select(TranscriptionJob).where(TranscriptionJob.state == TranscriptionState.QUEUED)):
+
+                    queued = session.exec(select(TranscriptionJob)
+                                            .where(TranscriptionJob.state == TranscriptionState.QUEUED)
+                                            .order_by(TranscriptionJob.priority.desc(), TranscriptionJob.queue_time)
+                                            .limit(1)).first()
+                    if queued:                    
                         queued.state = TranscriptionState.RUNNING
                         queued.message = "Transcription started"
                         queued.start_time = time.time()
@@ -213,7 +220,7 @@ async def process_transcription_queue():
                                 if k not in ('input', 'outputs'):
                                     parms[k] = v
 
-                            logging.info(f"Starting transcription job {queued.id} on {xscript_engine}: {parms}")
+                            logging.info(f"Starting transcription job {queued.id} ({queued.priority}, {queued.queue_time}) on {xscript_engine}: {parms}")
                             await asyncio.to_thread(processors[xscript_engine], queued, config)
                             logging.info(f"Finished transcribing {queued.id}, {queued.state}: {queued.message}")
                         else:

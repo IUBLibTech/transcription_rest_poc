@@ -28,9 +28,10 @@ def main():
     submit.add_argument("input_bucket", type=str, help="Bucket containing the input file")
     submit.add_argument("input_object", type=str, help="Object key for the input file")
     submit.add_argument("--output_bucket", type=str, default=None, help="Bucket containing the output files (if different than input bucket)")
+    submit.add_argument('--priority', default=1, type=int, choices=[0, 1, 2], help="Job priority")
     submit.add_argument("--language", default="en", 
                         choices=['auto', 'en', 'es', 'fr', 'de'], 
-                        help="Language to use")
+                        help="Language to use")    
     submit.add_argument("--model", default="small.en", 
                         choices=["tiny.en", "tiny", "base.en", "base", 
                                  "small.en", "small", "medium.en", "medium", 
@@ -44,9 +45,10 @@ def main():
     submit.add_argument("input_bucket", type=str, help="Bucket containing the input file")
     submit.add_argument("input_object", type=str, help="Object key for the input file")
     submit.add_argument("--output_bucket", type=str, default=None, help="Bucket containing the output files (if different than input bucket)")
+    submit.add_argument('--priority', default=1, type=int, choices=[0, 1, 2], help="Job priority")
     submit.add_argument("--language", default="en", 
                         choices=['auto', 'en', 'es', 'fr', 'de'], 
-                        help="Language to use")
+                        help="Language to use")    
     submit.add_argument("--model", default="small.en", 
                         choices=["tiny", "tiny.en", "tiny-q5_1", "tiny.en-q5_1", "tiny-q8_0", 
                                  "base", "base.en", "base-q5_1", "base.en-q5_1", "base-q8_0", "small", 
@@ -180,6 +182,7 @@ def submit_job(args, options):
                                            args.s3_endpoint, 'put', args.output_bucket,
                                            options['outputs'][k], 7*24*3600-1)
     options['outputs'] = new_outputs
+    options['priority'] = args.priority
 
     dump_json(options)
     r = requests.post(args.endpoint + f"/transcription/",

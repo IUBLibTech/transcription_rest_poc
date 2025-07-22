@@ -24,6 +24,7 @@ async def lifespan(app: FastAPI):
     # things at startup
     # -- create the database as needed
     # -- restart any background processes that need it
+    app.server_lock = False  # start with the service accepting jobs
     config: ServerConfig = app.server_config
     engine = create_engine("sqlite:///" + config.files.database,
                            connect_args={'check_same_thread': False})
@@ -60,6 +61,28 @@ def validate_credentials(credentials: HTTPAuthorizationCredentials):
     raise HTTPException(401, "Invalid authorization token")
 
 
+@app.get("/transcription/lock")
+async def lock_transcription_queue(session: SessionDep,
+                                   credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]):
+    "Block new jobs from being submitted (admin only)"
+    user, is_admin = validate_credentials(credentials)
+    if not is_admin:
+        raise HTTPException(401, "Unauthorized")
+    app.server_lock = True    
+    return {"ok": True}
+    
+
+@app.get("/transcription/unlock")
+async def unlock_transcription_queue(session: SessionDep,
+                                   credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)]):
+    "Allow new jobs to be submitted (admin only)"
+    user, is_admin = validate_credentials(credentials)
+    if not is_admin:
+        raise HTTPException(401, "Unauthorized")
+    app.server_lock = False
+    return {"ok": True}
+
+
 @app.get("/transcription/")
 async def get_transcription_list(session: SessionDep, 
                                  credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
@@ -82,6 +105,8 @@ async def new_transcription_job(req: TranscriptionRequest,
     # database so we can reconsitute it at processing time.  The rest of the data
     # is the processing/status information that the processing will fill in.
     user, is_admin = validate_credentials(credentials)  
+    if app.server_lock:
+        raise HTTPException(503, "Submitting new jobs is prohibited")
     job = TranscriptionJob(owner=user,
                            state=TranscriptionState.QUEUED,
                            message="Job has been queued",
@@ -184,7 +209,7 @@ async def process_transcription_queue():
                                       'whisper.cpp': process_whispercpp}
                         if xscript_engine in processors:
                             parms = {}
-                            for k, v in req.options.items():
+                            for k, v in req.options.model_dump().items():
                                 if k not in ('input', 'outputs'):
                                     parms[k] = v
 

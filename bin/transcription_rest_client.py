@@ -60,6 +60,9 @@ def main():
     for fmt in ('json', 'vtt', 'txt', 'csv', 'meta'):
         submit.add_argument(f"--{fmt}", type=str, help=f"object name for {fmt} output")
 
+    lock = subparsers.add_parser("lock", help="Lock/Unlock the submission queue")
+    lock.add_argument("state", choices=["on", "off"], help="Turn on/off the submission queue lock")
+
     args = parser.parse_args()
 
     # check environment variables
@@ -83,9 +86,11 @@ def main():
         'info': job_info,
         'delete': delete_job,
         'whisper': whisper,
-        'whispercpp': whisper_cpp}[args.action](args)
+        'whispercpp': whisper_cpp,
+        'lock': manage_lock}[args.action](args)
     except Exception as e:
         print(f"Error: {e}")    
+
 
 def list_jobs(args):
     r = requests.get(args.endpoint + "/transcription/",
@@ -102,6 +107,7 @@ def purge_jobs(args):
                      headers={'Authorization': f"Bearer {args.token}"})   
 
     print("Extraneous rows should be purged")
+
 
 def job_info(args):    
     r = requests.get(args.endpoint + f"/transcription/{args.id}",
@@ -185,6 +191,15 @@ def submit_job(args, options):
     r.raise_for_status()
     dump_json(r.json())
 
+
+def manage_lock(args):
+    "Turn on/off the job queue lock"
+    if args.state == "on":
+        r = requests.get(args.endpoint + "/transcription/lock")
+    else:
+        r = requests.get(args.endpoint + "/transcription/unlock")
+    r.raise_for_status()
+    
 
 def dump_json(data):
     print(json.dumps(data, indent=2, sort_keys=True))

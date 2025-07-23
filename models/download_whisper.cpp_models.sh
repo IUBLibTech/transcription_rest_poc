@@ -12,5 +12,5 @@ for model in tiny tiny.en tiny-q5_1 tiny.en-q5_1 tiny-q8_0 \
              large-v1 \
              large-v2 large-v2-q5_0 large-v2-q8_0 \
              large-v3 large-v3-q5_0 large-v3-turbo large-v3-turbo-q5_0 large-v3-turbo-q8_0; do
-    $SCRIPT_DIR/..//whisper.cpp/download-ggml-model.sh $model whisper.cpp
+    $SCRIPT_DIR/../whisper.cpp/download-ggml-model.sh $model whisper.cpp
 done

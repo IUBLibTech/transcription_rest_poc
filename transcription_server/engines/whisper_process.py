@@ -13,16 +13,16 @@ from whisper.transcribe import transcribe
 import subprocess
 from config_model import ServerConfig
 import logging
+import torch
 
 def process_whisper(job: TranscriptionJob, config: ServerConfig):
     """The heavy lifting.  This actually runs a whisper job based on
        the parameters."""
     # we're in a separate thread from the rest of the asyncio stuff, which
     # means we're not going to bog down the web interface.  Maybe.  It may
-    # still need to be pushed into a different process, we'll see.   
-    # At this point I don't want to think about unloading model data from
-    # the GPU.     
-    try:
+    # still need to be pushed into a different process, we'll see.    
+    model = None
+    try:        
         # Get our original request from the job
         req = WhisperOptions(**json.loads(job.request)['options'])
         with TemporaryDirectory() as tmpdir:
@@ -47,14 +47,17 @@ def process_whisper(job: TranscriptionJob, config: ServerConfig):
 
             # load the model
             #model = whisper.load_model(req.model, download_root=sys.path[0] + "/models/openai-whisper")
-            model = whisper.load_model(req.model, download_root=config.files.models_dir + "/openai-whisper")
+            logging.debug(f"Cuda is {'available' if torch.cuda.is_available() else 'not available'}.")
+            model = whisper.load_model(req.model, download_root=config.files.models_dir + "/openai-whisper",
+                                       device="cuda" if torch.cuda.is_available() else "cpu")
 
             # prep and load the file
             audio = whisper.load_audio(tmpdir + "/input_audio.dat", 16000)
             job.media_length = len(audio) / 16000
             start = time.time()
+            lang = str(req.language)
             result = transcribe(model, audio, 
-                                language=req.language if req.language != 'auto' else None,
+                                language=lang if lang != 'auto' else None,
                                 word_timestamps=True)
             job.processing_time = time.time() - start
             job.language_used = req.language
@@ -83,3 +86,10 @@ def process_whisper(job: TranscriptionJob, config: ServerConfig):
         job.state = TranscriptionState.ERROR
         job.message = str(e)
         logging.exception(f"Transcription Exception for job {job}: {e}")
+
+    finally:
+        if model:
+            del model.encoder
+            del model.decoder
+            model = None
+        torch.cuda.empty_cache()

@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
                            connect_args={'check_same_thread': False})
     SQLModel.metadata.create_all(engine)
     t = asyncio.create_task(process_transcription_queue())
+    logging.info("Ready to serve")
     yield
     # things at shutdown
     t.cancel()

@@ -3,6 +3,7 @@ versitygw_environment.sh
 transcription.db
 models/openai-whisper
 models/whisper.cpp
+models/faster-whisper
 whisper.cpp/whisper.cpp
 whisper.cpp/whisper-cli
 whisper.cpp/download-ggml-model.sh

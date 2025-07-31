@@ -8,6 +8,7 @@ import asyncio
 from job_model import TranscriptionJob, TranscriptionState, TranscriptionRequest
 from engines.whisper_process import process_whisper
 from engines.whispercpp_process import process_whispercpp
+from engines.faster_whisper_process import process_fasterwhisper
 from config_model import ServerConfig
 import json
 import logging
@@ -214,7 +215,8 @@ async def process_transcription_queue():
                         xscript_engine = req.options.engine
                         # real work would happen here.  
                         processors = {'openai-whisper': process_whisper,
-                                      'whisper.cpp': process_whispercpp}
+                                      'whisper.cpp': process_whispercpp,
+                                      'faster-whisper': process_fasterwhisper}
                         if xscript_engine in processors:
                             parms = {}
                             for k, v in req.options.model_dump().items():

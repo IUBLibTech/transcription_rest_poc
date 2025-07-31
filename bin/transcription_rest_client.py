@@ -62,6 +62,32 @@ def main():
     for fmt in ('json', 'vtt', 'txt', 'csv', 'meta'):
         submit.add_argument(f"--{fmt}", type=str, help=f"object name for {fmt} output")
 
+
+    submit = subparsers.add_parser("faster", help="Submit a new faster-whisper job")
+    submit.add_argument("s3_endpoint", type=str, help="S3 server endpoint")
+    submit.add_argument("input_bucket", type=str, help="Bucket containing the input file")
+    submit.add_argument("input_object", type=str, help="Object key for the input file")
+    submit.add_argument("--output_bucket", type=str, default=None, help="Bucket containing the output files (if different than input bucket)")
+    submit.add_argument('--priority', default=1, type=int, choices=[0, 1, 2], help="Job priority")
+    submit.add_argument("--language", default="en", 
+                        choices=['auto', 'en', 'es', 'fr', 'de'], 
+                        help="Language to use")    
+    submit.add_argument("--model", default="small.en", 
+                        choices=["tiny", "tiny.en", "small", "small.en", "medium",
+                                 "medium.en",  "distil-small.en", "distil-medium.en",
+                                 "large-v2", "large-v3", "large-v3-turbo", "distil-large-v2",
+                                 "distil-large-v3",
+                                 "tiny_int8", "tiny.en_int8", "small_int8", "small.en_int8", "medium_int8",
+                                 "medium.en_int8",  "distil-small.en_int8", "distil-medium.en_int8",
+                                 "large-v2_int8", "large-v3_int8", "large-v3-turbo_int8", "distil-large-v2_int8",
+                                 "distil-large-v3_int8",                                   
+                                  ],
+                        help="Model to use for transcription")
+    for fmt in ('json', 'vtt', 'txt', 'meta'):
+        submit.add_argument(f"--{fmt}", type=str, help=f"object name for {fmt} output")
+
+
+
     lock = subparsers.add_parser("lock", help="Lock/Unlock the submission queue")
     lock.add_argument("state", choices=["on", "off"], help="Turn on/off the submission queue lock")
 
@@ -73,7 +99,7 @@ def main():
         print("You must set the TRANSCRIPTION_TOKEN environment variable")
         exit(1)
 
-    if args.action in ('whisper', 'whispercpp'):
+    if args.action in ('whisper', 'whispercpp', 'faster'):
         # we need to have S3_ACCESS_KEY and S3_SECRET_KEY environment
         # variables to talk to S3
         args.access_key = environ.get('S3_ACCESS_KEY', None)
@@ -89,6 +115,7 @@ def main():
         'delete': delete_job,
         'whisper': whisper,
         'whispercpp': whisper_cpp,
+        'faster': faster_whisper,
         'lock': manage_lock}[args.action](args)
     except Exception as e:
         print(f"Error: {e}")    
@@ -153,6 +180,33 @@ def whisper_cpp(args):
                }
     vargs = vars(args)
     for fmt in ('json', 'txt', 'vtt', 'csv', 'meta'):
+        out_obj = vargs.get(fmt, None)
+        if out_obj is not None:
+            options['outputs'][f"{fmt}_url"] = out_obj
+    if not options['outputs']:
+        raise ValueError("At least one output format must be selected")
+    submit_job(args, options)
+
+
+def faster_whisper(args):
+    # build the base options for a faster_whisper submit.
+    if args.model.endswith('_int8'):
+        # use 8-bit compute.
+        args.model = args.model[0:-5]
+        compute_type = "int8"
+    else:
+        compute_type = "default"
+
+    
+    options = {'engine': 'faster-whisper',
+               'language': args.language,
+               'model': args.model,
+               'input': '',
+               'outputs': {},
+               'compute_type': compute_type
+               }
+    vargs = vars(args)
+    for fmt in ('json', 'txt', 'vtt', 'meta'):
         out_obj = vargs.get(fmt, None)
         if out_obj is not None:
             options['outputs'][f"{fmt}_url"] = out_obj

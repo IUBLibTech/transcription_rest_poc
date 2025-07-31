@@ -77,7 +77,7 @@ def process_whisper(job: TranscriptionJob, config: ServerConfig):
             
             job.state = TranscriptionState.FINISHED
             job.message = "Transcription has completed successfully"    
-
+            job.finish_time = time.time()
             if req.outputs.meta_url:
                 # try to write the metadata out.  I don't really care if it fails.
                 r = requests.put(req.outputs.meta_url, data=job.model_dump_json())

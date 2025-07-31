@@ -5,7 +5,7 @@ from sqlmodel import SQLModel, Field
 from enum import StrEnum, IntEnum
 from engines.whisper_model import WhisperOptions
 from engines.whispercpp_model import WhisperCPPOptions
-
+from engines.faster_whisper_model import FasterWhisperOptions
 
 TranscriptionState = StrEnum("TranscriptionState", 
                              "QUEUED RUNNING CANCELED FINISHED ERROR EXPIRED")
@@ -28,7 +28,7 @@ class TranscriptionRequest(BaseModel):
                               description="After the job has completed remove the database entry after this many seconds (reading the job info after completion will also remove it)")
     priority: TranscriptionPriority = Field(default=TranscriptionPriority.NORMAL,
                                             description="Transcription priority")
-    options: WhisperOptions | WhisperCPPOptions = Field(discriminator="engine",
+    options: WhisperOptions | WhisperCPPOptions | FasterWhisperOptions = Field(discriminator="engine",
                                                         description="Engine-specific options")
 
     @model_validator(mode='after')

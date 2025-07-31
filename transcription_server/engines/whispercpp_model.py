@@ -15,7 +15,7 @@ class WhisperCPPOutputs(BaseModel):
 
     @model_validator(mode="after")
     def check_for_at_least_one_output(self) -> Self:
-        for v in (self.json_url, self.vtt_url, self.txt_url):
+        for v in (self.json_url, self.vtt_url, self.txt_url, self.csv_url):
             if v is not None and v != '':                
                 return self        
         raise ValueError("At least one output must be selected")

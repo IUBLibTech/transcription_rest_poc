@@ -88,7 +88,7 @@ def process_whispercpp(job: TranscriptionJob, config: ServerConfig):
 
             job.state = TranscriptionState.FINISHED
             job.message = "Transcription has completed successfully"    
-
+            job.finish_time = time.time()
             if req.outputs.meta_url:
                 # try to write the metadata out.  I don't really care if it fails.
                 r = requests.put(req.outputs.meta_url, data=job.model_dump_json())
@@ -97,4 +97,5 @@ def process_whispercpp(job: TranscriptionJob, config: ServerConfig):
         logging.exception(f"Transcription Exception for job {job}: {e}")
         job.state = TranscriptionState.ERROR
         job.message = str(e)
+
 
